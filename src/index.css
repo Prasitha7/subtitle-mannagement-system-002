@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 26 16% 11%;
+    --foreground: 40 10% 92%;
+
+    --card: 231 17% 18%;
+    --card-foreground: 40 10% 92%;
+
+    --popover: 231 17% 18%;
+    --popover-foreground: 40 10% 92%;
+
+    --primary: 189 100% 50%;
+    --primary-foreground: 26 16% 11%;
+
+    --secondary: 231 17% 18%;
+    --secondary-foreground: 40 10% 92%;
+
+    --muted: 231 17% 18%;
+    --muted-foreground: 215 16% 60%;
+
+    --accent: 48 100% 52%;
+    --accent-foreground: 26 16% 11%;
+
+    --destructive: 4 90% 70%;
+    --destructive-foreground: 40 10% 92%;
+
+    --border: 217 18% 35%;
+    --input: 217 18% 35%;
+    --ring: 189 100% 50%;
+
+    --radius: 0.375rem;
+
+    --sidebar-background: 26 16% 11%;
+    --sidebar-foreground: 40 10% 92%;
+    --sidebar-primary: 189 100% 50%;
+    --sidebar-primary-foreground: 26 16% 11%;
+    --sidebar-accent: 231 17% 18%;
+    --sidebar-accent-foreground: 40 10% 92%;
+    --sidebar-border: 217 18% 35%;
+    --sidebar-ring: 189 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+  }
+
+  .font-mono-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+}
+
+@layer utilities {
+  .timeline-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  .playhead-glow {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.6), 0 0 40px rgba(0, 217, 255, 0.3);
+  }
+
+  .subtitle-block-glow:hover {
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+    transform: scale(1.02);
+  }
+
+  .waveform-gradient {
+    background: linear-gradient(to top, rgba(0, 217, 255, 0.8), rgba(0, 217, 255, 0));
+  }
+}
+
+/* Smooth transitions */
+.fade-transition {
+  transition: opacity 200ms ease;
+}
+
+/* Stagger animation delays */
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-1 {
+  animation: slideInFromTop 0.4s ease forwards;
+}
+
+.stagger-2 {
+  animation: slideInFromTop 0.4s ease 0.08s forwards;
+  opacity: 0;
+}
+
+.stagger-3 {
+  animation: slideInFromTop 0.4s ease 0.16s forwards;
+  opacity: 0;
+}
+
+.stagger-4 {
+  animation: slideInFromTop 0.4s ease 0.24s forwards;
+  opacity: 0;
+}
