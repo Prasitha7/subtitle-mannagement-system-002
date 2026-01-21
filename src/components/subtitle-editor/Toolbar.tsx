@@ -1,4 +1,5 @@
-import { Upload, Download, Play, Pause, SkipForward, SkipBack, Keyboard, FileVideo } from 'lucide-react';
+import { Upload, Download, Play, Pause, SkipForward, SkipBack, Keyboard, FileVideo, Library } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -40,9 +41,23 @@ export default function Toolbar({
   hasVideo,
   hasSubtitles,
 }: ToolbarProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="stagger-1 h-16 bg-card border-b border-border px-6 flex items-center justify-between">
       <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2"
+          onClick={() => navigate('/library')}
+        >
+          <Library className="h-4 w-4" />
+          Library
+        </Button>
+
+        <div className="h-8 w-px bg-border" />
+
         <h1 className="text-xl font-bold text-foreground">Subtitle Editor</h1>
         
         <div className="h-8 w-px bg-border" />
