@@ -15,13 +15,15 @@ interface EpisodeListProps {
   onEpisodeSelect: (episode: Episode, seasonNumber: number) => void;
   onAddSubtitle: (episode: Episode, seasonNumber: number) => void;
   onEditSubtitle: (episode: Episode, seasonNumber: number, subtitleId: string) => void;
+  canEdit?: boolean;
 }
 
-export default function EpisodeList({ 
-  seasons, 
+export default function EpisodeList({
+  seasons,
   onEpisodeSelect,
   onAddSubtitle,
-  onEditSubtitle 
+  onEditSubtitle,
+  canEdit = false,
 }: EpisodeListProps) {
   return (
     <ScrollArea className="h-full">
@@ -47,8 +49,8 @@ export default function EpisodeList({
                       {/* Episode Thumbnail */}
                       <div className="w-32 h-20 bg-card rounded overflow-hidden flex-shrink-0">
                         {episode.thumbnailUrl ? (
-                          <img 
-                            src={episode.thumbnailUrl} 
+                          <img
+                            src={episode.thumbnailUrl}
                             alt={episode.title}
                             className="w-full h-full object-cover"
                           />
@@ -70,15 +72,17 @@ export default function EpisodeList({
                               {episode.duration}
                             </p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => onAddSubtitle(episode, season.number)}
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add Subtitle
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => onAddSubtitle(episode, season.number)}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Add Subtitle
+                            </Button>
+                          )}
                         </div>
 
                         {/* Subtitles */}
@@ -89,8 +93,8 @@ export default function EpisodeList({
                                 <Badge
                                   key={subtitle.id}
                                   variant="outline"
-                                  className="gap-1 cursor-pointer hover:bg-primary/10 hover:border-primary"
-                                  onClick={() => onEditSubtitle(episode, season.number, subtitle.id)}
+                                  className={`gap-1 ${canEdit ? 'cursor-pointer hover:bg-primary/10 hover:border-primary' : ''}`}
+                                  onClick={() => canEdit && onEditSubtitle(episode, season.number, subtitle.id)}
                                 >
                                   <Subtitles className="h-3 w-3" />
                                   {subtitle.language}

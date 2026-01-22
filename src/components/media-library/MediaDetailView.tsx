@@ -3,6 +3,7 @@ import { Movie, Series, Episode } from '@/types/media';
 import { Button } from '@/components/ui/button';
 import EpisodeList from './EpisodeList';
 import SubtitlesList from './SubtitlesList';
+import { useAuth } from '@/components/AuthProvider';
 
 interface MediaDetailViewProps {
   media: Movie | Series;
@@ -21,6 +22,8 @@ export default function MediaDetailView({
   onDownloadSubtitle,
   onAddSubtitle,
 }: MediaDetailViewProps) {
+  const { user } = useAuth();
+
   const handleEpisodeSelect = (episode: Episode, seasonNumber: number) => {
     // Handle episode selection
   };
@@ -131,6 +134,7 @@ export default function MediaDetailView({
               onDelete={onDeleteSubtitle}
               onDownload={onDownloadSubtitle}
               onAdd={() => onAddSubtitle()}
+              canEdit={!!user}
             />
           </div>
         ) : (
@@ -146,6 +150,7 @@ export default function MediaDetailView({
               onEpisodeSelect={handleEpisodeSelect}
               onAddSubtitle={handleEpisodeAddSubtitle}
               onEditSubtitle={handleEpisodeEditSubtitle}
+              canEdit={!!user}
             />
           </div>
         )}

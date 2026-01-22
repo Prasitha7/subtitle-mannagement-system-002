@@ -1,3 +1,9 @@
+export interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
 export interface SubtitleTrack {
   id: string;
   language: string;

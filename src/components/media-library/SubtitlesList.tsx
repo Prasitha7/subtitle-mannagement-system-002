@@ -10,6 +10,7 @@ interface SubtitlesListProps {
   onDelete: (subtitleId: string) => void;
   onDownload: (subtitleId: string) => void;
   onAdd: () => void;
+  canEdit?: boolean;
 }
 
 export default function SubtitlesList({
@@ -18,6 +19,7 @@ export default function SubtitlesList({
   onDelete,
   onDownload,
   onAdd,
+  canEdit = false,
 }: SubtitlesListProps) {
   return (
     <div className="h-full flex flex-col bg-card border border-border rounded-lg">
@@ -28,10 +30,12 @@ export default function SubtitlesList({
             {subtitles.length} {subtitles.length === 1 ? 'language' : 'languages'}
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={onAdd}>
-          <Plus className="h-4 w-4" />
-          Add Subtitle
-        </Button>
+        {canEdit && (
+          <Button variant="outline" size="sm" className="gap-2" onClick={onAdd}>
+            <Plus className="h-4 w-4" />
+            Add Subtitle
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1">
@@ -69,22 +73,26 @@ export default function SubtitlesList({
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => onEdit(subtitle.id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => onDelete(subtitle.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onEdit(subtitle.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => onDelete(subtitle.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
