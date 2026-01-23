@@ -1,82 +1,61 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { authApi, LoginRequest, RegisterRequest } from '@/api/auth-api';
 
-interface User {
-    id: string;
-    email: string;
-    role: string;
-}
-
 interface AuthContextType {
-    user: User | null;
+    token: string | null;
     loading: boolean;
     login: (data: LoginRequest) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     signOut: () => void;
+    isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({
-    user: null,
-    loading: true,
-    login: async () => { },
-    register: async () => { },
-    signOut: () => { },
-});
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+    const ctx = useContext(AuthContext);
+    if (!ctx) {
+        throw new Error('useAuth must be used inside AuthProvider');
+    }
+    return ctx;
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Restore session on page refresh
     useEffect(() => {
-        // Check for token in localStorage on mount
-        const token = localStorage.getItem('auth_token');
-        const restoreSession = async () => {
-            if (token) {
-                try {
-                    // Verify token or decode it.
-                    // For now, authApi.verifyToken mocks this.
-                    const userData = await authApi.verifyToken(token);
-                    // @ts-ignore
-                    setUser(userData);
-                } catch (error) {
-                    console.error("Failed to restore session", error);
-                    localStorage.removeItem('auth_token');
-                }
-            }
-            setLoading(false);
-        };
-
-        restoreSession();
+        const storedToken = localStorage.getItem('auth_token');
+        if (storedToken) {
+            setToken(storedToken);
+        }
+        setLoading(false);
     }, []);
 
     const login = async (data: LoginRequest) => {
-        const response = await authApi.login(data);
-        localStorage.setItem('auth_token', response.token);
-        // @ts-ignore
-        setUser(response.user);
+        const res = await authApi.login(data);
+        localStorage.setItem('auth_token', res.token);
+        setToken(res.token);
     };
 
     const register = async (data: RegisterRequest) => {
-        const response = await authApi.register(data);
-        localStorage.setItem('auth_token', response.token);
-        // @ts-ignore
-        setUser(response.user);
+        await authApi.register(data);
+        // registration does NOT log in automatically
     };
 
     const signOut = () => {
         localStorage.removeItem('auth_token');
-        setUser(null);
+        setToken(null);
     };
 
-    const value = {
-        user,
+    const value: AuthContextType = {
+        token,
         loading,
         login,
         register,
         signOut,
+        isAuthenticated: !!token,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
