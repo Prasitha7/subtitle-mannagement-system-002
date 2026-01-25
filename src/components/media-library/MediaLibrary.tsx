@@ -17,7 +17,7 @@ interface MediaLibraryProps {
 }
 
 export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -123,7 +123,7 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {user && (
+            {isAuthenticated && (
               <Button className="gap-2" onClick={() => setShowAddModal(true)}>
                 <Plus className="h-4 w-4" />
                 Add Media
@@ -181,7 +181,7 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
                   ? `No results for "${searchQuery}"`
                   : 'Add your first movie or series to get started'}
               </p>
-              {!searchQuery && user && (
+              {!searchQuery && isAuthenticated && (
                 <Button onClick={() => setShowAddModal(true)} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Add Media
