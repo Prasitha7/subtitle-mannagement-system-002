@@ -9,7 +9,6 @@ import MediaDetailView from './MediaDetailView';
 import AddMediaModal from './AddMediaModal';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/AuthProvider';
-import { useNavigate } from 'react-router-dom';
 
 import { mediaApi } from '@/api/media-api';
 
@@ -18,8 +17,7 @@ interface MediaLibraryProps {
 }
 
 export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -125,19 +123,10 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {user ? (
-              <>
-                <Button className="gap-2" onClick={() => setShowAddModal(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add Media
-                </Button>
-                <Button variant="outline" onClick={() => signOut()}>
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => navigate('/login')}>
-                Login
+            {user && (
+              <Button className="gap-2" onClick={() => setShowAddModal(true)}>
+                <Plus className="h-4 w-4" />
+                Add Media
               </Button>
             )}
           </div>
