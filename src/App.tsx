@@ -6,6 +6,7 @@ import { Toaster } from "./components/ui/sonner";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MySubtitles from "./pages/MySubtitles";
+import UserProfile from "./pages/UserProfile";
 import { AuthProvider } from "./components/AuthProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Navigation } from "./components/Navigation";
@@ -36,6 +37,11 @@ function App() {
           <Route path="/my-subtitles" element={
             <ProtectedRoute>
               <MySubtitles />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <UserProfile />
             </ProtectedRoute>
           } />
           <Route path="/login" element={<Login />} />

@@ -35,6 +35,11 @@ export function Navigation() {
                 <div className="flex items-center gap-4">
                     {isAuthenticated ? (
                         <>
+                            <Button variant="ghost" asChild className="mr-2">
+                                <Link to="/profile">
+                                    Profile
+                                </Link>
+                            </Button>
                             <Button variant="ghost" onClick={handleLogout}>
                                 Logout
                             </Button>
@@ -51,6 +56,6 @@ export function Navigation() {
                     )}
                 </div>
             </div>
-        </header>
+        </header >
     );
 }
