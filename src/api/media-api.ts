@@ -68,16 +68,43 @@ const sampleMedia: MediaItem[] = [
 const MOCK_DELAY = 600;
 
 export const mediaApi = {
-    getAll: async (): Promise<MediaItem[]> => {
-        // PRODUCTION:
-        // const response = await fetch('/api/media', { headers: getAuthHeader() });
-        // return response.json();
-        return new Promise((resolve) => setTimeout(() => resolve(sampleMedia), MOCK_DELAY));
+    getAll: async (
+        page: number = 1,
+        limit: number = 10,
+        type?: 'movie' | 'series' | 'all',
+        search?: string
+    ): Promise<{ items: MediaItem[], total: number }> => {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                let filtered = [...sampleMedia];
+
+                // 1. Filter by Type
+                if (type && type !== 'all') {
+                    filtered = filtered.filter(item => item.type === type);
+                }
+
+                // 2. Filter by Search
+                if (search) {
+                    const query = search.toLowerCase();
+                    filtered = filtered.filter(item =>
+                        item.title.toLowerCase().includes(query)
+                    );
+                }
+
+                // 3. Paginate
+                const total = filtered.length;
+                const startIndex = (page - 1) * limit;
+                const endIndex = startIndex + limit;
+                const items = filtered.slice(startIndex, endIndex);
+
+                resolve({ items, total });
+            }, MOCK_DELAY);
+        });
     },
 
+    // Legacy search method kept for backward compatibility if needed, 
+    // but the new unified getAll is preferred.
     search: async (query: string): Promise<MediaItem[]> => {
-        // PRODUCTION:
-        // const response = await fetch(`/api/media/search?q=${query}`);
         return new Promise((resolve) => {
             setTimeout(() => {
                 const results = sampleMedia.filter(m => m.title.toLowerCase().includes(query.toLowerCase()));

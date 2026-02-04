@@ -53,3 +53,11 @@ export interface Series {
 }
 
 export type MediaItem = Movie | Series;
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

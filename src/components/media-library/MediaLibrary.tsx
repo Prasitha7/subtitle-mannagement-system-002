@@ -25,18 +25,32 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
   const [activeTab, setActiveTab] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 10;
+
   useEffect(() => {
-    mediaApi.getAll().then((data) => {
-      setMediaItems(data);
+    setLoading(true);
+    // Use the new paginated API
+    mediaApi.getAll(
+      currentPage,
+      ITEMS_PER_PAGE,
+      activeTab as 'movie' | 'series' | 'all',
+      searchQuery
+    ).then((data) => {
+      setMediaItems(data.items);
+      setTotalItems(data.total);
       setLoading(false);
     });
-  }, []);
+  }, [currentPage, activeTab, searchQuery]);
 
-  const filteredMedia = mediaItems.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === 'all' || item.type === activeTab;
-    return matchesSearch && matchesTab;
-  });
+  // Reset to page 1 when filter or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery]);
+
+  // No more client-side filtering needed, as the API handles it
 
   const handleMediaClick = (media: MediaItem) => {
     setSelectedMedia(media);
@@ -91,9 +105,18 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
         seasons: [],
       };
 
+    // Re-fetch to update the list, or optimistic update (simplified here)
     setMediaItems((prev) => [newMedia, ...prev]);
     toast.success(`Added "${data.title}" to library`);
   };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= Math.ceil(totalItems / ITEMS_PER_PAGE)) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
   if (selectedMedia) {
     return (
@@ -165,9 +188,13 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
 
       {/* Media Grid */}
       <div className="flex-1 overflow-auto p-8">
-        {filteredMedia.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-            {filteredMedia.map((media) => (
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <p>Loading...</p>
+          </div>
+        ) : mediaItems.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 mb-8">
+            {mediaItems.map((media) => (
               <MediaCard key={media.id} media={media} onClick={handleMediaClick} />
             ))}
           </div>
@@ -191,6 +218,33 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
           </div>
         )}
       </div>
+
+      {/* Pagination Controls - Fixed Bottom */}
+      {!loading && totalPages > 1 && (
+        <div className="px-8 py-4 border-t border-border bg-background">
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <AddMediaModal
         isOpen={showAddModal}
