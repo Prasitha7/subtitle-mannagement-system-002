@@ -1,9 +1,9 @@
-// src/api/authApi.ts
+import { AUTH_API_URL } from './config';
 
-const AUTH_BASE_URL = 'http://localhost:8081/auth';
+const AUTH_BASE_URL = `${AUTH_API_URL}/auth`;
 
 export interface LoginRequest {
-    username: string;   // 🔴 must be username
+    username: string;
     password: string;
 }
 
@@ -28,7 +28,8 @@ export const authApi = {
         });
 
         if (!response.ok) {
-            throw new Error('Invalid username or password');
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Invalid username or password');
         }
 
         return response.json();
@@ -44,9 +45,11 @@ export const authApi = {
         });
 
         if (!response.ok) {
-            throw new Error('Registration failed');
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Registration failed');
         }
 
-        return response.json();
+        // Registration might not return a token, just 200 OK
+        return response.text().then(text => text ? JSON.parse(text) : {});
     },
 };

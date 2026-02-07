@@ -15,7 +15,11 @@ function MediaLibraryPage() {
   const navigate = useNavigate();
 
   const handleNavigateToEditor = (subtitleId?: string) => {
-    navigate('/editor');
+    if (subtitleId) {
+      navigate(`/editor/${subtitleId}`);
+    } else {
+      navigate('/editor');
+    }
   };
 
   return <MediaLibrary onNavigateToEditor={handleNavigateToEditor} />;
@@ -34,11 +38,17 @@ function App() {
               <SubtitleEditor />
             </ProtectedRoute>
           } />
+          <Route path="/editor/:subtitleId" element={
+            <ProtectedRoute>
+              <SubtitleEditor />
+            </ProtectedRoute>
+          } />
           <Route path="/my-subtitles" element={
             <ProtectedRoute>
               <MySubtitles />
             </ProtectedRoute>
           } />
+
           <Route path="/profile" element={
             <ProtectedRoute>
               <UserProfile />
@@ -49,7 +59,7 @@ function App() {
         </Routes>
         <Toaster />
       </AuthProvider>
-    </Suspense>
+    </Suspense >
   );
 }
 

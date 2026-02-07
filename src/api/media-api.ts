@@ -1,71 +1,7 @@
-import { MediaItem } from '@/types/media';
+import { MediaItem, PaginatedResponse, SubtitleTrack } from '@/types/media';
+import { SUBTITLE_API_URL, getAuthHeaders } from './config';
 
-// Reuse the sample media for the mock
-const sampleMedia: MediaItem[] = [
-    {
-        id: 'movie-1',
-        title: 'Inception',
-        year: 2010,
-        duration: '2h 28m',
-        type: 'movie',
-        posterUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400&q=80',
-        backdropUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&q=80',
-        description: 'A thief who steals corporate secrets through dream-sharing technology is given the task of planting an idea into the mind of a CEO.',
-        subtitles: [
-            { id: 'sub-1', language: 'English', languageCode: 'en', format: 'SRT', addedAt: '2024-01-15' },
-            { id: 'sub-2', language: 'Spanish', languageCode: 'es', format: 'SRT', addedAt: '2024-01-16' },
-        ],
-    },
-    {
-        id: 'movie-2',
-        title: 'Interstellar',
-        year: 2014,
-        duration: '2h 49m',
-        type: 'movie',
-        posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80',
-        backdropUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1200&q=80',
-        description: 'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
-        subtitles: [
-            { id: 'sub-3', language: 'English', languageCode: 'en', format: 'VTT', addedAt: '2024-02-10' },
-        ],
-    },
-    {
-        id: 'series-1',
-        title: 'Breaking Bad',
-        year: 2008,
-        type: 'series',
-        posterUrl: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=400&q=80',
-        backdropUrl: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1200&q=80',
-        description: 'A high school chemistry teacher diagnosed with lung cancer turns to manufacturing methamphetamine.',
-        seasons: [
-            {
-                id: 'season-1',
-                number: 1,
-                title: 'Season 1',
-                episodes: [
-                    {
-                        id: 'ep-1-1',
-                        number: 1,
-                        title: 'Pilot',
-                        duration: '58m',
-                        subtitles: [
-                            { id: 'sub-4', language: 'English', languageCode: 'en', format: 'SRT', addedAt: '2024-01-20' },
-                        ],
-                    },
-                    {
-                        id: 'ep-1-2',
-                        number: 2,
-                        title: "Cat's in the Bag...",
-                        duration: '48m',
-                        subtitles: [],
-                    },
-                ],
-            },
-        ],
-    },
-];
-
-const MOCK_DELAY = 600;
+const MEDIA_BASE_URL = `${SUBTITLE_API_URL}/api/media`;
 
 export const mediaApi = {
     getAll: async (
@@ -73,45 +9,127 @@ export const mediaApi = {
         limit: number = 10,
         type?: 'movie' | 'series' | 'all',
         search?: string
-    ): Promise<{ items: MediaItem[], total: number }> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                let filtered = [...sampleMedia];
+    ): Promise<PaginatedResponse<MediaItem>> => {
+        const params = new URLSearchParams();
+        params.append('page', (page - 1).toString()); // Backend is 0-indexed
+        params.append('size', limit.toString());
+        params.append('sort', 'id,desc');
 
-                // 1. Filter by Type
-                if (type && type !== 'all') {
-                    filtered = filtered.filter(item => item.type === type);
-                }
+        // Note: Check if backend supports these filters on the page endpoint
+        // If not, we might need a separate search endpoint or client-side filtering
+        if (search) params.append('search', search); // Assuming backend uses 'search' or similar
+        // if (type && type !== 'all') params.append('type', type.toUpperCase()); 
 
-                // 2. Filter by Search
-                if (search) {
-                    const query = search.toLowerCase();
-                    filtered = filtered.filter(item =>
-                        item.title.toLowerCase().includes(query)
-                    );
-                }
-
-                // 3. Paginate
-                const total = filtered.length;
-                const startIndex = (page - 1) * limit;
-                const endIndex = startIndex + limit;
-                const items = filtered.slice(startIndex, endIndex);
-
-                resolve({ items, total });
-            }, MOCK_DELAY);
+        const response = await fetch(`${MEDIA_BASE_URL}/page?${params.toString()}`, {
+            headers: {
+                // Public endpoint usually, but sending auth if available is good practice
+                ...getAuthHeaders(),
+            }
         });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch media');
+        }
+
+        const data = await response.json();
+
+        // Transform backend response to frontend model
+        const items = data.content.map(transformMedia);
+
+        return {
+            items,
+            total: data.totalElements,
+            page: data.number + 1, // Convert back to 1-indexed
+            limit: data.size,
+            totalPages: data.totalPages
+        };
     },
 
-    // Legacy search method kept for backward compatibility if needed, 
-    // but the new unified getAll is preferred.
+    getById: async (id: string): Promise<MediaItem> => {
+        // Fetch media details and subtitles in parallel
+        const [mediaRes, subtitlesRes] = await Promise.all([
+            fetch(`${MEDIA_BASE_URL}/${id}`, { headers: getAuthHeaders() }),
+            fetch(`${SUBTITLE_API_URL}/api/subtitles/public?mediaId=${id}`, { headers: getAuthHeaders() })
+        ]);
+
+        if (!mediaRes.ok) {
+            throw new Error('Failed to fetch media details');
+        }
+
+        const mediaData = await mediaRes.json();
+        const media = transformMedia(mediaData);
+
+        if (subtitlesRes.ok) {
+            const subtitlesData = await subtitlesRes.json();
+            // Map backend subtitles to frontend SubtitleTrack
+            const subtitles: SubtitleTrack[] = subtitlesData.map((sub: any) => ({
+                id: sub.id,
+                language: sub.language,
+                languageCode: sub.language.substring(0, 2).toLowerCase(), // heuristics
+                format: 'SRT', // Default or derive from file mapping
+                fileUrl: sub.fileUrl, // Ensure backend provides this or we construct it
+                addedAt: sub.uploadedAt || new Date().toISOString()
+            }));
+
+            if (media.type === 'movie') {
+                media.subtitles = subtitles;
+            } else {
+                // TODO: Distribute subtitles to episodes for Series
+                // For now, we don't have episode logic fully mapped in backend response
+            }
+        }
+
+        return media;
+    },
+
+    create: async (data: Partial<MediaItem>): Promise<MediaItem> => {
+        // Strict payload for creation
+        const payload = {
+            title: data.title,
+            type: data.type?.toUpperCase(), // Backend expects MOVIE or SERIES
+            externalId: `manual-${Date.now()}`, // Generate if missing
+            releaseDate: data.year ? `${data.year}-01-01` : new Date().toISOString().split('T')[0]
+        };
+
+        const response = await fetch(`${MEDIA_BASE_URL}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to create media');
+        }
+
+        const responseData = await response.json();
+        return transformMedia(responseData);
+    },
+
+    // Legacy search compatibility
     search: async (query: string): Promise<MediaItem[]> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const results = sampleMedia.filter(m => m.title.toLowerCase().includes(query.toLowerCase()));
-                resolve(results);
-            }, MOCK_DELAY);
-        });
-    },
+        const res = await mediaApi.getAll(1, 100, 'all', query);
+        return res.items;
+    }
+};
 
-    // Add other methods as needed: addMedia, addSubtitle, etc.
+const transformMedia = (data: any): MediaItem => {
+    // Handle transformation from backend entity to MediaItem
+    // Backend: id, title, type, externalId, releaseDate
+    // Frontend: id, title, type, year, posterUrl?, backdropUrl?, description?
+
+    const year = data.releaseDate ? new Date(data.releaseDate).getFullYear() : new Date().getFullYear();
+
+    return {
+        id: data.id,
+        title: data.title,
+        type: data.type?.toLowerCase() as 'movie' | 'series',
+        year: year,
+        // Default placeholders since backend doesn't have these yet
+        description: data.description || 'No description available.',
+        posterUrl: undefined,
+        backdropUrl: undefined,
+        // For series/movies structure
+        ...(data.type === 'SERIES' ? { seasons: [] } : { subtitles: [] })
+    } as MediaItem;
 };

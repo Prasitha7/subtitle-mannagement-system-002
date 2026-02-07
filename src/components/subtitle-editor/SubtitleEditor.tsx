@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Subtitle, ExportFormat } from '@/types/subtitle';
 import {
   parseSRT,
@@ -15,12 +16,109 @@ import ActiveSubtitleEditor from './ActiveSubtitleEditor';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import ExportWizard from './ExportWizard';
 import EmptyState from './EmptyState';
-import BulkOperationsModal from './BulkOperationsModal';
+import SaveSubtitleModal from './SaveSubtitleModal';
 import { toast } from 'sonner';
+import { subtitleApi } from '@/api/subtitle-api';
+import { Button } from '@/components/ui/button';
+import { Save } from 'lucide-react';
 
 export default function SubtitleEditor() {
+  const { subtitleId } = useParams();
+  const [searchParams] = useSearchParams();
+  const mediaId = searchParams.get('mediaId');
+  const navigate = useNavigate();
+
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Load subtitle if ID is present
+  useEffect(() => {
+    if (!subtitleId) return;
+
+    const loadSubtitle = async () => {
+      setIsLoading(true);
+      try {
+        const subtitleMeta = await subtitleApi.getById(subtitleId);
+        if (subtitleMeta.fileUrl) {
+          const res = await fetch(subtitleMeta.fileUrl);
+          const text = await res.text();
+          const parsed = subtitleMeta.format === 'VTT' || subtitleMeta.fileUrl.endsWith('.vtt')
+            ? parseVTT(text)
+            : parseSRT(text);
+          setSubtitles(parsed);
+          toast.success('Subtitle loaded');
+        } else {
+          toast.error('No file content available');
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error('Failed to load subtitle');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSubtitle();
+  }, [subtitleId]);
+
+  const handleSaveClick = () => {
+    if (subtitleId) {
+      handleSaveExisting();
+    } else {
+      setShowSaveModal(true);
+    }
+  };
+
+  const handleSaveExisting = async () => {
+    setIsSaving(true);
+    try {
+      const edits = subtitles.map((s, idx) => ({
+        index: idx + 1,
+        startMs: Math.round(s.startTime * 1000),
+        endMs: Math.round(s.endTime * 1000),
+        text: s.text
+      }));
+
+      await subtitleApi.updateLines(subtitleId!, edits, "Updated via Editor");
+      toast.success('Saved successfully');
+    } catch (err: any) {
+      toast.error('Failed to save: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveNew = async (data: { title: string; language: string }) => {
+    if (!mediaId) {
+      toast.error('No Media ID found. Cannot link subtitle.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      // Convert subtitles to string (SRT/VTT) then to File
+      const content = exportSubtitles(subtitles, 'SRT');
+      const file = new File([content], `${data.title}.srt`, { type: 'text/srt' });
+
+      await subtitleApi.upload({
+        mediaId: mediaId,
+        language: data.language,
+        title: data.title,
+        file: file
+      });
+      toast.success('Subtitle created successfully');
+      setShowSaveModal(false);
+      // Navigate back or reload to show "Saved" state?
+      // Ideally navigate to details or update URL to have subtitleId
+      navigate(-1); // Go back to media library usually
+    } catch (err: any) {
+      toast.error('Failed to create subtitle: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const [selectedSubtitleIds, setSelectedSubtitleIds] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -66,12 +164,15 @@ export default function SubtitleEditor() {
       } else if (e.code === 'Delete' && selectedSubtitleId) {
         e.preventDefault();
         handleSubtitleDelete(selectedSubtitleId);
+      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { // Added Ctrl+S
+        e.preventDefault();
+        handleSaveClick();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [duration, selectedSubtitleId]);
+  }, [duration, selectedSubtitleId, subtitleId]); // Add subtitleId dependency
 
   const handleImportSubtitle = () => {
     subtitleInputRef.current?.click();
@@ -140,18 +241,8 @@ export default function SubtitleEditor() {
         return;
       }
 
-      const firstPart: Subtitle = {
-        ...subtitle,
-        endTime: splitTime,
-        id: generateId(),
-      };
-
-      const secondPart: Subtitle = {
-        ...subtitle,
-        startTime: splitTime,
-        id: generateId(),
-        index: subtitle.index + 1,
-      };
+      const firstPart: Subtitle = { ...subtitle, endTime: splitTime, id: generateId() };
+      const secondPart: Subtitle = { ...subtitle, startTime: splitTime, id: generateId(), index: subtitle.index + 1 };
 
       setSubtitles((prev) => {
         const index = prev.findIndex((s) => s.id === subtitle.id);
@@ -159,7 +250,6 @@ export default function SubtitleEditor() {
         newSubtitles.splice(index, 1, firstPart, secondPart);
         return newSubtitles.map((s, i) => ({ ...s, index: i }));
       });
-
       toast.success('Subtitle split successfully');
     },
     []
@@ -172,17 +262,11 @@ export default function SubtitleEditor() {
         endTime: subtitle2.endTime,
         text: `${subtitle1.text}\n${subtitle2.text}`,
       };
-
       setSubtitles((prev) => {
-        const newSubtitles = prev.filter(
-          (s) => s.id !== subtitle1.id && s.id !== subtitle2.id
-        );
+        const newSubtitles = prev.filter((s) => s.id !== subtitle1.id && s.id !== subtitle2.id);
         newSubtitles.push(mergedSubtitle);
-        return newSubtitles
-          .sort((a, b) => a.startTime - b.startTime)
-          .map((s, i) => ({ ...s, index: i }));
+        return newSubtitles.sort((a, b) => a.startTime - b.startTime).map((s, i) => ({ ...s, index: i }));
       });
-
       toast.success('Subtitles merged successfully');
     },
     []
@@ -193,25 +277,14 @@ export default function SubtitleEditor() {
       const newSubtitles = prev.filter((s) => s.id !== id);
       return newSubtitles.map((s, i) => ({ ...s, index: i }));
     });
-    if (selectedSubtitleId === id) {
-      setSelectedSubtitleId(null);
-    }
+    if (selectedSubtitleId === id) setSelectedSubtitleId(null);
     toast.success('Subtitle deleted');
   }, [selectedSubtitleId]);
 
   const handleSubtitleSelect = useCallback((subtitle: Subtitle, isMultiSelect: boolean = false) => {
     if (isMultiSelect) {
-      setSelectedSubtitleIds((prev) => {
-        if (prev.includes(subtitle.id)) {
-          // Remove if already selected
-          return prev.filter((id) => id !== subtitle.id);
-        } else {
-          // Add to selection
-          return [...prev, subtitle.id];
-        }
-      });
+      setSelectedSubtitleIds((prev) => prev.includes(subtitle.id) ? prev.filter((id) => id !== subtitle.id) : [...prev, subtitle.id]);
     } else {
-      // Single select
       setSelectedSubtitleId(subtitle.id);
       setSelectedSubtitleIds([subtitle.id]);
       setCurrentTime(subtitle.startTime);
@@ -219,51 +292,30 @@ export default function SubtitleEditor() {
   }, []);
 
   const handleBulkApplyOffset = useCallback((offset: number) => {
-    setSubtitles((prev) =>
-      prev.map((s) => {
-        if (selectedSubtitleIds.includes(s.id)) {
-          return {
-            ...s,
-            startTime: Math.max(0, s.startTime + offset),
-            endTime: s.endTime + offset,
-          };
-        }
-        return s;
-      })
-    );
+    setSubtitles((prev) => prev.map((s) => selectedSubtitleIds.includes(s.id) ? { ...s, startTime: Math.max(0, s.startTime + offset), endTime: s.endTime + offset } : s));
     toast.success(`Applied time offset to ${selectedSubtitleIds.length} subtitles`);
   }, [selectedSubtitleIds]);
 
   const handleBulkFindReplace = useCallback((find: string, replace: string) => {
     let count = 0;
-    setSubtitles((prev) =>
-      prev.map((s) => {
-        if (selectedSubtitleIds.includes(s.id) && s.text.includes(find)) {
-          count++;
-          return {
-            ...s,
-            text: s.text.replace(new RegExp(find, 'g'), replace),
-          };
-        }
-        return s;
-      })
-    );
+    setSubtitles((prev) => prev.map((s) => {
+      if (selectedSubtitleIds.includes(s.id) && s.text.includes(find)) {
+        count++;
+        return { ...s, text: s.text.replace(new RegExp(find, 'g'), replace) };
+      }
+      return s;
+    }));
     toast.success(`Replaced ${count} occurrences in ${selectedSubtitleIds.length} subtitles`);
   }, [selectedSubtitleIds]);
 
   const handleBulkAdjustReadingSpeed = useCallback((charsPerSecond: number) => {
-    setSubtitles((prev) =>
-      prev.map((s) => {
-        if (selectedSubtitleIds.includes(s.id)) {
-          const newDuration = s.text.length / charsPerSecond;
-          return {
-            ...s,
-            endTime: s.startTime + newDuration,
-          };
-        }
-        return s;
-      })
-    );
+    setSubtitles((prev) => prev.map((s) => {
+      if (selectedSubtitleIds.includes(s.id)) {
+        const newDuration = s.text.length / charsPerSecond;
+        return { ...s, endTime: s.startTime + newDuration };
+      }
+      return s;
+    }));
     toast.success(`Adjusted duration for ${selectedSubtitleIds.length} subtitles`);
   }, [selectedSubtitleIds]);
 
@@ -297,20 +349,29 @@ export default function SubtitleEditor() {
       />
 
       {/* Toolbar */}
-      <Toolbar
-        onImportSubtitle={handleImportSubtitle}
-        onImportVideo={handleImportVideo}
-        onExport={handleExport}
-        onTogglePlay={() => setIsPlaying((prev) => !prev)}
-        onStepBackward={() => setCurrentTime((prev) => Math.max(0, prev - 0.033))}
-        onStepForward={() => setCurrentTime((prev) => Math.min(duration, prev + 0.033))}
-        onToggleShortcuts={() => setShowShortcuts((prev) => !prev)}
-        isPlaying={isPlaying}
-        playbackSpeed={playbackSpeed}
-        onPlaybackSpeedChange={setPlaybackSpeed}
-        hasVideo={!!videoUrl}
-        hasSubtitles={subtitles.length > 0}
-      />
+      <div className="border-b border-border bg-card p-2 flex items-center justify-between">
+        <Toolbar
+          onImportSubtitle={handleImportSubtitle}
+          onImportVideo={handleImportVideo}
+          onExport={handleExport}
+          onTogglePlay={() => setIsPlaying((prev) => !prev)}
+          onStepBackward={() => setCurrentTime((prev) => Math.max(0, prev - 0.033))}
+          onStepForward={() => setCurrentTime((prev) => Math.min(duration, prev + 0.033))}
+          onToggleShortcuts={() => setShowShortcuts((prev) => !prev)}
+          isPlaying={isPlaying}
+          playbackSpeed={playbackSpeed}
+          onPlaybackSpeedChange={setPlaybackSpeed}
+          hasVideo={!!videoUrl}
+          hasSubtitles={subtitles.length > 0}
+        />
+        {/* Show Save button if we are in Edit mode OR Create mode (mediaId present) */}
+        {(subtitleId || mediaId) && (
+          <Button onClick={handleSaveClick} disabled={isSaving || isLoading} className="gap-2 mr-4">
+            <Save className="h-4 w-4" />
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+      </div>
 
       {/* Main Content */}
       {subtitles.length === 0 && !videoUrl ? (
@@ -366,15 +427,15 @@ export default function SubtitleEditor() {
               />
             </div>
 
-          {/* Active Subtitle Editor */}
-          <div className="h-[320px]">
-            <ActiveSubtitleEditor
-              subtitle={selectedSubtitle}
-              onSubtitleUpdate={handleSubtitleUpdate}
-            />
+            {/* Active Subtitle Editor */}
+            <div className="h-[320px]">
+              <ActiveSubtitleEditor
+                subtitle={selectedSubtitle}
+                onSubtitleUpdate={handleSubtitleUpdate}
+              />
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Modals */}
@@ -382,7 +443,7 @@ export default function SubtitleEditor() {
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
       />
-      
+
       <ExportWizard
         isOpen={showExportWizard}
         onClose={() => setShowExportWizard(false)}
@@ -390,6 +451,7 @@ export default function SubtitleEditor() {
         format={exportFormat}
         onExport={handleExportConfirm}
       />
+      <SaveSubtitleModal isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} onSave={handleSaveNew} isSaving={isSaving} />
     </div>
   );
 }

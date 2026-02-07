@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/components/AuthProvider';
 
 import { mediaApi } from '@/api/media-api';
+import { subtitleApi } from '@/api/subtitle-api';
 
 interface MediaLibraryProps {
   onNavigateToEditor: (subtitleId?: string) => void;
@@ -52,8 +53,17 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
 
   // No more client-side filtering needed, as the API handles it
 
-  const handleMediaClick = (media: MediaItem) => {
-    setSelectedMedia(media);
+  const handleMediaClick = async (media: MediaItem) => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      const fullMedia = await mediaApi.getById(media.id);
+      setSelectedMedia(fullMedia);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load media details');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -62,52 +72,65 @@ export default function MediaLibrary({ onNavigateToEditor }: MediaLibraryProps) 
 
   const handleEditSubtitle = (subtitleId: string) => {
     onNavigateToEditor(subtitleId);
-    toast.success('Opening subtitle in editor');
   };
 
-  const handleDeleteSubtitle = (subtitleId: string) => {
-    // In a real app, this would update the state/backend
-    toast.success('Subtitle deleted');
+  const handleDeleteSubtitle = async (subtitleId: string) => {
+    if (!confirm('Are you sure you want to delete this subtitle?')) return;
+    try {
+      await subtitleApi.delete(subtitleId);
+      toast.success('Subtitle deleted');
+      // Refresh if needed, but managing state is harder here without parent reload
+      // Ideally trigger a reload of the details view
+      if (selectedMedia) {
+        const updated = await mediaApi.getById(selectedMedia.id);
+        setSelectedMedia(updated);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete subtitle');
+    }
   };
 
-  const handleDownloadSubtitle = (subtitleId: string) => {
-    toast.success('Downloading subtitle...');
+  const handleDownloadSubtitle = async (subtitleId: string) => {
+    try {
+      const subtitle = await subtitleApi.getById(subtitleId);
+      if (subtitle.fileUrl) {
+        window.open(subtitle.fileUrl, '_blank');
+      } else {
+        toast.error('No file URL available');
+      }
+    } catch (err: any) {
+      toast.error('Failed to get download URL');
+    }
   };
 
   const handleAddSubtitle = (episodeId?: string, seasonNumber?: number) => {
-    // Navigate to editor to create new subtitle
-    onNavigateToEditor();
+    onNavigateToEditor(undefined); // Passing undefined means new subtitle
   };
 
-  const handleAddMedia = (data: {
+  const handleAddMedia = async (data: {
     title: string;
     year: number;
     type: 'movie' | 'series';
     duration?: string;
     description?: string;
   }) => {
-    const newMedia: MediaItem = data.type === 'movie'
-      ? {
-        id: `movie-${Date.now()}`,
+    try {
+      await mediaApi.create({
         title: data.title,
         year: data.year,
-        duration: data.duration || '0m',
-        type: 'movie',
-        description: data.description,
-        subtitles: [],
-      }
-      : {
-        id: `series-${Date.now()}`,
-        title: data.title,
-        year: data.year,
-        type: 'series',
-        description: data.description,
-        seasons: [],
-      };
+        type: data.type,
+        // description and duration are ignored for now by backend
+      });
+      toast.success(`Added "${data.title}" to library`);
 
-    // Re-fetch to update the list, or optimistic update (simplified here)
-    setMediaItems((prev) => [newMedia, ...prev]);
-    toast.success(`Added "${data.title}" to library`);
+      // Refresh list
+      setCurrentPage(1);
+      const res = await mediaApi.getAll(1, ITEMS_PER_PAGE, activeTab as any, searchQuery);
+      setMediaItems(res.items);
+      setTotalItems(res.total);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add media');
+    }
   };
 
   const handlePageChange = (newPage: number) => {
