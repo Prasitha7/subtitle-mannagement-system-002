@@ -22,7 +22,7 @@ export default function MediaDetailView({
   onDownloadSubtitle,
   onAddSubtitle,
 }: MediaDetailViewProps) {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const handleEpisodeSelect = (episode: Episode, seasonNumber: number) => {
     // Handle episode selection
@@ -134,7 +134,7 @@ export default function MediaDetailView({
               onDelete={onDeleteSubtitle}
               onDownload={onDownloadSubtitle}
               onAdd={() => onAddSubtitle()}
-              canEdit={!!user}
+              canEdit={isAuthenticated}
             />
           </div>
         ) : (
@@ -150,7 +150,7 @@ export default function MediaDetailView({
               onEpisodeSelect={handleEpisodeSelect}
               onAddSubtitle={handleEpisodeAddSubtitle}
               onEditSubtitle={handleEpisodeEditSubtitle}
-              canEdit={!!user}
+              canEdit={isAuthenticated}
             />
           </div>
         )}
